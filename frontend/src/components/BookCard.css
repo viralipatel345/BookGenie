@@ -1,0 +1,114 @@
+.book-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.25s, box-shadow 0.25s;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.book-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--text-muted);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.book-card--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(232, 168, 73, 0.25);
+}
+
+.book-card__cover {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  background: var(--bg-secondary);
+}
+
+.book-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.book-card__info {
+  flex: 1;
+}
+
+.book-card__title {
+  font-family: "DM Serif Display", serif;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-card__author {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 300;
+  margin-bottom: 0.4rem;
+}
+
+.book-card__rating {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.book-card__rating .star {
+  color: var(--accent);
+}
+
+.book-card__badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.book-card__save {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-muted);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  line-height: 1;
+}
+
+.book-card__save:hover {
+  background: var(--bg-card-hover);
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+.book-card__save--saved {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}

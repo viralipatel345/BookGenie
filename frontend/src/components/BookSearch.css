@@ -1,0 +1,144 @@
+.search-wrapper {
+  position: relative;
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.search-bar {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.9rem 1.25rem;
+  font-family: "Outfit", sans-serif;
+  font-size: 1rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.search-input:focus {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px rgba(232, 168, 73, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-btn {
+  padding: 0.9rem 1.75rem;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--bg-primary);
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.search-btn:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.search-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* History dropdown */
+.history-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  list-style: none;
+  overflow: hidden;
+  z-index: 100;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.history-dropdown li {
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.15s;
+}
+
+.history-dropdown li:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.history-icon {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.history-year {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Year filter */
+.year-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.year-filter__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.year-filter__label input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+
+.year-input {
+  width: 90px;
+  padding: 0.35rem 0.6rem;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.year-input:focus {
+  border-color: var(--accent-dim);
+}
