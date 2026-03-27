@@ -5,6 +5,7 @@ import requests
 import jwt
 import anthropic
 import chromadb
+import rag_engine
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from functools import wraps
 from flask import Flask, request, jsonify, Response, stream_with_context
@@ -391,9 +392,10 @@ def index_books():
         description = (book.get("description") or "")[:500]
         doc_text = f"{title} by {authors_str}. {description}".strip()
 
+        image = book.get("image") or ""
         ids.append(book_id)
         documents.append(doc_text)
-        metadatas.append({"title": title, "authors": authors_str})
+        metadatas.append({"title": title, "authors": authors_str, "image": image})
 
     if ids:
         _books_collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
@@ -483,6 +485,167 @@ def explain_recommendation():
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Book Oracle — Multi-turn RAG Chat (SSE streaming)
+# ---------------------------------------------------------------------------
+
+ORACLE_SYSTEM_PROMPT = (
+    "You are Book Oracle, the literary AI assistant for BookGenie. "
+    "Help users discover books through conversation. "
+    "When books are provided as RAG context, reference them specifically by title and author. "
+    "Keep responses concise: 2-3 sentences plus 1-3 specific book recommendations. "
+    "If no books are in the library yet, warmly suggest the user search for books first to build the library. "
+    "Be warm and knowledgeable, like a great independent bookshop owner who loves matching readers with perfect books."
+)
+
+
+@app.route("/api/chat", methods=["POST"])
+@require_auth
+def chat():
+    """Stream a multi-turn Book Oracle conversation with RAG context from ChromaDB."""
+    data = request.get_json() or {}
+    messages = data.get("messages", [])
+
+    if not messages:
+        return jsonify({"error": "messages are required"}), 400
+
+    # Extract last user message for ChromaDB query
+    last_user_msg = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            last_user_msg = m.get("content", "")
+            break
+
+    # Query ChromaDB for related books
+    rag_books = []
+    rag_context = ""
+    try:
+        if last_user_msg and _books_collection.count() > 0:
+            results = _books_collection.query(
+                query_texts=[last_user_msg],
+                n_results=min(3, _books_collection.count()),
+            )
+            docs = (results.get("documents") or [[]])[0]
+            metas = (results.get("metadatas") or [[]])[0]
+            for doc, meta in zip(docs, metas):
+                rag_books.append({
+                    "title": meta.get("title", ""),
+                    "authors": meta.get("authors", ""),
+                    "image": meta.get("image", ""),
+                })
+            if docs:
+                rag_context = "\n".join(f"- {d}" for d in docs)
+    except Exception:
+        rag_context = ""
+
+    # Build messages for Claude — inject RAG context into last user message
+    claude_messages = []
+    for i, m in enumerate(messages):
+        role = m.get("role")
+        content = m.get("content", "")
+        if role == "user" and i == len(messages) - 1 and rag_context:
+            content = (
+                f"{content}\n\n"
+                f"[Books in your library that may be relevant:]\n{rag_context}"
+            )
+        if role in ("user", "assistant"):
+            claude_messages.append({"role": role, "content": content})
+
+    def generate():
+        # First, send the sources as structured data
+        sources_payload = json.dumps({"books": rag_books})
+        yield f"data: [SOURCES]{sources_payload}\n\n"
+
+        try:
+            with _anthropic_client.messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=ORACLE_SYSTEM_PROMPT,
+                messages=claude_messages,
+            ) as stream:
+                for event in stream:
+                    if (
+                        hasattr(event, "type")
+                        and event.type == "content_block_delta"
+                        and hasattr(event, "delta")
+                        and getattr(event.delta, "type", None) == "text_delta"
+                    ):
+                        chunk = event.delta.text
+                        # Escape newlines so SSE stays valid
+                        safe_chunk = chunk.replace("\n", "\\n")
+                        yield f"data: {safe_chunk}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# FAISS RAG — new endpoints (do not modify existing endpoints above)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/index-books", methods=["POST"])
+def faiss_index_books():
+    """Chunk, embed, and store a list of book objects in the FAISS index."""
+    data = request.get_json() or {}
+    books = data.get("books", [])
+
+    if not books:
+        return jsonify({"error": "Provide a non-empty 'books' list"}), 400
+
+    try:
+        count = rag_engine.index_books(books)
+        return jsonify({"success": True, "chunks_indexed": count, "books_received": len(books)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/recommend-smart", methods=["POST"])
+def recommend_smart():
+    """RAG-powered recommendation: retrieve top-5 chunks then ask Claude."""
+    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not anthropic_api_key:
+        return jsonify({"error": "ANTHROPIC_API_KEY is not set. Add it to backend/.env"}), 500
+
+    data = request.get_json() or {}
+    query = (data.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "'query' field is required"}), 400
+
+    try:
+        answer = rag_engine.recommend_smart(query, anthropic_api_key)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    if answer is None:
+        return jsonify({
+            "error": "No books indexed yet. Use POST /api/index-books first to add books."
+        }), 404
+
+    return jsonify({"query": query, "recommendation": answer})
+
+
+@app.route("/api/clear-index", methods=["POST"])
+def clear_faiss_index():
+    """Delete the FAISS index from disk."""
+    deleted = rag_engine.clear_index()
+    if deleted:
+        return jsonify({"success": True, "message": "FAISS index deleted."})
+    return jsonify({"success": False, "message": "No FAISS index found on disk."})
+
+
+@app.route("/api/rag-status", methods=["GET"])
+def rag_status():
+    """Return whether a FAISS index exists and how many vectors it holds."""
+    status = rag_engine.get_index_status()
+    return jsonify(status)
 
 
 if __name__ == "__main__":
